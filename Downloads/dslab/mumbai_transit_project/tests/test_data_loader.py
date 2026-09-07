@@ -7,7 +7,7 @@ from src import data_loader
 
 def test_load_and_clean_data_shapes():
     stations_df, edges_df = data_loader.load_and_clean_data()
-    assert len(stations_df) == 25
+    assert len(stations_df) == len(data_loader._STATION_RECORDS)
     assert stations_df["station_id"].is_unique
     assert set(stations_df.columns) >= {
         "station_id", "name", "line", "latitude", "longitude", "daily_footfall", "interchange_hub",

@@ -13,7 +13,7 @@ from typing import Literal
 import networkx as nx
 import pandas as pd
 
-from src import config
+from src import config, fare
 
 logger = config.get_logger(__name__)
 
@@ -112,6 +112,7 @@ def shortest_route(
         })
         prev_line = line
 
+    total_distance = round(total_distance, 2)
     return {
         "origin": src,
         "destination": dst,
@@ -122,7 +123,9 @@ def shortest_route(
         "num_stations": len(path),
         "interchanges": interchanges,
         "total_time_mins": round(total_time, 1),
-        "total_distance_km": round(total_distance, 2),
+        "total_distance_km": total_distance,
+        "fare_inr": fare.estimate_fare_inr(total_distance),
+        "co2_saved_kg": fare.estimate_co2_saved_kg(total_distance),
     }
 
 

@@ -12,7 +12,7 @@ def graph():
 
 
 def test_graph_is_connected(graph):
-    assert graph.number_of_nodes() == 25
+    assert graph.number_of_nodes() == len(data_loader._STATION_RECORDS)
     summary = graph_analytics.network_summary(graph)
     assert summary["is_connected"] is True
 

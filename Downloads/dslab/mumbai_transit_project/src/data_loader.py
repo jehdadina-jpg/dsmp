@@ -1,11 +1,14 @@
 """Real Mumbai Suburban Railway dataset: source extract, cleaning & enrichment.
 
 This module is the single source of truth for the project's data. It models
-**every real station** on the Western Line (Churchgate-Virar), Central Line
-(CSMT-Kalyan) and Harbour Line (CSMT-Panvel) -- 75 unique stations, 76 edges
--- plus one genuine Trans-Harbour link (Thane<->Vashi), included because it
-is the real, direct service that makes Thane an actual multi-line junction.
-Nothing here is procedurally randomised.
+**every real station** on the Western Line (Churchgate-Bordi Road, including
+the Dahanu Road extension), Central Line (CSMT-Kalyan plus both the
+Kalyan-Kasara and Kalyan-Khopoli/Karjat branches, and the Kurla-Lokmanya
+Tilak Terminus spur), Harbour Line (CSMT-Panvel, plus the real Wadala
+Road-King's Circle-Andheri-Goregaon branch) and the full Trans-Harbour Line
+(Thane-Vashi, both the direct express edge and every real intermediate stop:
+Airoli, Digha Gaon, Rabale, Ghansoli, Koparkhairane, Turbhe). Nothing here is
+procedurally randomised.
 
 Data provenance (full citations in README.md -> "Data Sources & Methodology"):
     * Station identity, line membership and real adjacency order: Wikipedia
@@ -29,13 +32,17 @@ Data provenance (full citations in README.md -> "Data Sources & Methodology"):
       source (an RTI disclosure or a GTFS feed) to move this from
       "estimate" to "official".
 
-Scope: Churchgate-Virar / CSMT-Kalyan / CSMT-Panvel, i.e. the historical
-three-line "core" suburban network -- not the newer Vasai-Diva, Airport, or
-Uran lines, and not the extension beyond Virar to Dahanu Road. CSMT-Masjid-
-Sandhurst Road is real shared trackage used by both Central and Harbour
-services, so it is modeled as shared edges/stations (line="Central/Harbour")
-rather than duplicated, the same way Dadar is shared between Western/Central.
-distance_km is a real haversine calculation over the coordinates above.
+Scope: every real stop on the Western, Central, Harbour and Trans-Harbour
+lines, including the Virar-Bordi Road extension, the Kalyan-Kasara and
+Kalyan-Khopoli (via Karjat) branches, the Kurla-Lokmanya Tilak Terminus
+spur, the Wadala Road-King's Circle-Andheri-Goregaon Harbour branch, and
+every real Trans-Harbour stop between Thane and Vashi -- not the separate
+Vasai-Diva, Airport, Uran or Panvel-Karjat lines. CSMT-Masjid-Sandhurst Road
+is real shared trackage used by both Central and Harbour services, so it is
+modeled as shared edges/stations (line="Central/Harbour") rather than
+duplicated, the same way Dadar is shared between Western/Central and the
+Mahim-Goregaon stretch is shared between Western/Harbour. distance_km is a
+real haversine calculation over the coordinates above.
 """
 
 from __future__ import annotations
@@ -148,6 +155,71 @@ _STATION_RECORDS: list[StationRecord] = [
     StationRecord("MAN", "Mansarovar", "Harbour", 19.016434, 73.080655, 60_000, False),
     StationRecord("KHN", "Khandeshwar", "Harbour", 19.007350, 73.095283, 51_600, False),
     StationRecord("PNV", "Panvel", "Harbour", 18.989320, 73.122290, 220_000, False),
+    # -- Harbour branch: Wadala Road -> King's Circle -> Andheri/Goregaon ----
+    # (real Harbour trains also run this branch, shared with Western stations
+    # already declared above -- see the line-field update further down).
+    StationRecord("KGC", "King's Circle", "Harbour", 19.032600, 72.857400, 40_000, False),
+    # -- Western Line extension: Virar -> Dahanu Road / Bordi Road, 10 stns --
+    StationRecord("VAI", "Vaitarna", "Western", 19.472000, 72.791000, 8_000, False),
+    StationRecord("SAF", "Saphale", "Western", 19.518500, 72.809100, 22_000, False),
+    StationRecord("KLV", "Kelve Road", "Western", 19.573400, 72.776100, 10_000, False),
+    StationRecord("PLG", "Palghar", "Western", 19.696300, 72.764500, 95_000, False),
+    StationRecord("UMR", "Umroli", "Western", 19.721700, 72.748200, 6_000, False),
+    StationRecord("BOI", "Boisar", "Western", 19.799800, 72.742300, 60_000, False),
+    StationRecord("VNG2", "Vangaon", "Western", 19.893400, 72.721800, 9_000, False),
+    StationRecord("DAR", "Dahanu Road", "Western", 19.970900, 72.737000, 65_000, False),
+    StationRecord("GHV", "Gholvad", "Western", 20.005000, 72.735000, 7_000, False),
+    StationRecord("BDR", "Bordi Road", "Western", 20.030000, 72.728000, 5_000, False),
+    # -- Central Line branch: Kalyan -> Kasara, 9 stations -------------------
+    StationRecord("TTW", "Titwala", "Central", 19.299600, 73.200300, 48_000, False),
+    StationRecord("KHD", "Khadavli", "Central", 19.324700, 73.231200, 12_000, False),
+    StationRecord("VSN", "Vasind", "Central", 19.362700, 73.262600, 15_000, False),
+    StationRecord("ASN", "Asangaon", "Central", 19.404600, 73.285300, 40_000, False),
+    StationRecord("ATG", "Atgaon", "Central", 19.439400, 73.313200, 9_000, False),
+    StationRecord("THS", "Thansit", "Central", 19.467700, 73.342100, 4_000, False),
+    StationRecord("KRD", "Khardi", "Central", 19.497800, 73.374600, 11_000, False),
+    StationRecord("UMB", "Umbermali", "Central", 19.535400, 73.406700, 4_000, False),
+    StationRecord("KAS", "Kasara", "Central", 19.608300, 73.446300, 35_000, False),
+    # -- Central Line branch: Kalyan -> Khopoli (via Karjat), 13 stations ----
+    StationRecord("VIT", "Vithalwadi", "Central", 19.218000, 73.142000, 20_000, False),
+    StationRecord("ULH", "Ulhasnagar", "Central", 19.208500, 73.155000, 90_000, False),
+    StationRecord("AMB", "Ambarnath", "Central", 19.199600, 73.192700, 105_000, False),
+    StationRecord("BDL", "Badlapur", "Central", 19.155400, 73.235000, 120_000, False),
+    StationRecord("VNG", "Vangani", "Central", 19.110300, 73.265000, 25_000, False),
+    StationRecord("SHL", "Shelu", "Central", 19.079600, 73.293400, 6_000, False),
+    StationRecord("NER", "Neral Junction", "Central", 19.033900, 73.316800, 55_000, False),
+    StationRecord("KRJ", "Karjat", "Central", 18.910700, 73.323700, 110_000, False),
+    StationRecord("PLS", "Palasdhari", "Central", 18.871000, 73.352000, 3_000, False),
+    StationRecord("KLI", "Kelavli", "Central", 18.838600, 73.381000, 6_000, False),
+    StationRecord("DOL", "Dolavli", "Central", 18.809000, 73.396000, 3_000, False),
+    StationRecord("LOW", "Lowjee", "Central", 18.785300, 73.409000, 3_000, False),
+    StationRecord("KHP", "Khopoli", "Central", 18.788000, 73.334600, 65_000, False),
+    # -- Central Line branch: Kurla -> Lokmanya Tilak Terminus ---------------
+    StationRecord("LTT", "Lokmanya Tilak Terminus", "Central", 19.072800, 72.882600, 90_000, False),
+    # -- Trans-Harbour intermediate stops: Thane -> Vashi, 6 stations --------
+    StationRecord("ARL", "Airoli", "Trans-Harbour", 19.159200, 72.998600, 55_000, False),
+    StationRecord("DGG", "Digha Gaon", "Trans-Harbour", 19.147000, 73.000000, 12_000, False),
+    StationRecord("RBL", "Rabale", "Trans-Harbour", 19.118000, 72.998500, 20_000, False),
+    StationRecord("GNS", "Ghansoli", "Trans-Harbour", 19.108000, 73.006000, 30_000, False),
+    StationRecord("KPK", "Koparkhairane", "Trans-Harbour", 19.103900, 73.015900, 25_000, False),
+    StationRecord("TRB", "Turbhe", "Trans-Harbour", 19.082700, 73.015800, 22_000, False),
+]
+
+# The Andheri<->Goregaon stretch of the Western Line is also a real, live
+# Harbour Line branch (Wadala Road -> King's Circle -> Mahim -> Bandra ->
+# ... -> Goregaon). Rather than duplicate those stations under a second
+# station_id, they are relabelled "Western/Harbour" in place -- the same
+# shared-station convention already used for Dadar and CSMT/Masjid/Sandhurst.
+_HARBOUR_SHARED_WESTERN_STOPS = {
+    "MAI", "BND", "KHA", "SAN", "VLP", "AND", "JOG", "RAM", "GRG",
+}
+_STATION_RECORDS = [
+    (
+        StationRecord(s.station_id, s.name, "Western/Harbour", s.latitude, s.longitude,
+                       s.daily_footfall, s.interchange_hub)
+        if s.station_id in _HARBOUR_SHARED_WESTERN_STOPS else s
+    )
+    for s in _STATION_RECORDS
 ]
 
 # (source_id, target_id, line_name) -- real adjacency between two stations,
@@ -159,9 +231,9 @@ _EDGE_TOPOLOGY: list[tuple[str, str, str]] = [
     ("CHG", "MAR", "Western"), ("MAR", "CHA", "Western"), ("CHA", "GRA", "Western"),
     ("GRA", "MMC", "Western"), ("MMC", "MAH", "Western"), ("MAH", "LPR", "Western"),
     ("LPR", "PRA", "Western"), ("PRA", "DDR", "Western"), ("DDR", "MAT", "Western"),
-    ("MAT", "MAI", "Western"), ("MAI", "BND", "Western"), ("BND", "KHA", "Western"),
-    ("KHA", "SAN", "Western"), ("SAN", "VLP", "Western"), ("VLP", "AND", "Western"),
-    ("AND", "JOG", "Western"), ("JOG", "RAM", "Western"), ("RAM", "GRG", "Western"),
+    ("MAT", "MAI", "Western"), ("MAI", "BND", "Western/Harbour"), ("BND", "KHA", "Western/Harbour"),
+    ("KHA", "SAN", "Western/Harbour"), ("SAN", "VLP", "Western/Harbour"), ("VLP", "AND", "Western/Harbour"),
+    ("AND", "JOG", "Western/Harbour"), ("JOG", "RAM", "Western/Harbour"), ("RAM", "GRG", "Western/Harbour"),
     ("GRG", "MAL", "Western"), ("MAL", "KAN", "Western"), ("KAN", "BVI", "Western"),
     ("BVI", "DAH", "Western"), ("DAH", "MIR", "Western"), ("MIR", "BHA", "Western"),
     ("BHA", "NAI", "Western"), ("NAI", "VAS", "Western"), ("VAS", "NAL", "Western"),
@@ -185,8 +257,35 @@ _EDGE_TOPOLOGY: list[tuple[str, str, str]] = [
     ("JUI", "NRL", "Harbour"), ("NRL", "SEA", "Harbour"), ("SEA", "CBD", "Harbour"),
     ("CBD", "KHR", "Harbour"), ("KHR", "MAN", "Harbour"), ("MAN", "KHN", "Harbour"),
     ("KHN", "PNV", "Harbour"),
-    # Trans-Harbour (real direct Thane <-> Vashi service)
-    ("THN", "VSH", "Trans-Harbour"),
+    # Trans-Harbour: real intermediate-stop chain, Thane -> Vashi. (A direct
+    # THN-VSH express service also exists in reality, but it is not modeled
+    # as a *second* edge here -- with every real intermediate stop now in the
+    # graph, an extra shortcut edge would just duplicate this same corridor
+    # and double-draw it on the map.)
+    ("THN", "ARL", "Trans-Harbour"), ("ARL", "DGG", "Trans-Harbour"),
+    ("DGG", "RBL", "Trans-Harbour"), ("RBL", "GNS", "Trans-Harbour"),
+    ("GNS", "KPK", "Trans-Harbour"), ("KPK", "TRB", "Trans-Harbour"),
+    ("TRB", "VSH", "Trans-Harbour"),
+    # Harbour branch: Wadala Road -> King's Circle -> Mahim (joins the
+    # Western/Harbour-tagged stretch above, not duplicated here)
+    ("WDR", "KGC", "Harbour"), ("KGC", "MAI", "Harbour"),
+    # Western extension: Virar -> Dahanu Road / Bordi Road
+    ("VIR", "VAI", "Western"), ("VAI", "SAF", "Western"), ("SAF", "KLV", "Western"),
+    ("KLV", "PLG", "Western"), ("PLG", "UMR", "Western"), ("UMR", "BOI", "Western"),
+    ("BOI", "VNG2", "Western"), ("VNG2", "DAR", "Western"), ("DAR", "GHV", "Western"),
+    ("GHV", "BDR", "Western"),
+    # Central branch: Kalyan -> Kasara
+    ("KYN", "TTW", "Central"), ("TTW", "KHD", "Central"), ("KHD", "VSN", "Central"),
+    ("VSN", "ASN", "Central"), ("ASN", "ATG", "Central"), ("ATG", "THS", "Central"),
+    ("THS", "KRD", "Central"), ("KRD", "UMB", "Central"), ("UMB", "KAS", "Central"),
+    # Central branch: Kalyan -> Khopoli (via Karjat)
+    ("KYN", "VIT", "Central"), ("VIT", "ULH", "Central"), ("ULH", "AMB", "Central"),
+    ("AMB", "BDL", "Central"), ("BDL", "VNG", "Central"), ("VNG", "SHL", "Central"),
+    ("SHL", "NER", "Central"), ("NER", "KRJ", "Central"), ("KRJ", "PLS", "Central"),
+    ("PLS", "KLI", "Central"), ("KLI", "DOL", "Central"), ("DOL", "LOW", "Central"),
+    ("LOW", "KHP", "Central"),
+    # Central branch: Kurla -> Lokmanya Tilak Terminus
+    ("KUR", "LTT", "Central"),
 ]
 
 

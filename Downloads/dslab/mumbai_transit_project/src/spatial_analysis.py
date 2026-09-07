@@ -168,16 +168,26 @@ _THEME_CSS = """
 
 
 def build_folium_map(
-    stations_df: pd.DataFrame, edges_df: pd.DataFrame, buffers_gdf: gpd.GeoDataFrame
+    stations_df: pd.DataFrame, edges_df: pd.DataFrame, buffers_gdf: gpd.GeoDataFrame,
 ) -> folium.Map:
     """Assemble the full interactive dark-mode map: lines, stations, buffers."""
     center_lat = stations_df["latitude"].mean()
     center_lon = stations_df["longitude"].mean()
 
+    # Both folium's built-in "CartoDB dark_matter" alias and Carto's own
+    # basemaps.cartocdn.com CDN now require an API key for anonymous use --
+    # every unauthenticated tile request comes back stamped "API key
+    # required" instead of map imagery. Standard OpenStreetMap tiles are
+    # still free/keyless, so use those and fake the dark theme with a CSS
+    # filter on the tile pane (a well-known no-key dark-map trick) instead.
     fmap = folium.Map(
-        location=[center_lat, center_lon], zoom_start=11, tiles="CartoDB dark_matter",
+        location=[center_lat, center_lon], zoom_start=11, tiles="OpenStreetMap",
         control_scale=True,
     )
+    fmap.get_root().html.add_child(folium.Element(
+        "<style>.leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) "
+        "brightness(0.95) contrast(0.9) saturate(0.6);}</style>"
+    ))
 
     coords = stations_df.set_index("station_id")
 
@@ -188,7 +198,7 @@ def build_folium_map(
     for row in edges_df.itertuples(index=False):
         a, b = coords.loc[row.source_id], coords.loc[row.target_id]
         locations = [(a.latitude, a.longitude), (b.latitude, b.longitude)]
-        color = config.LINE_COLORS.get(row.line_name, "#999999")
+        color = _line_color(row.line_name)
         group = line_groups[row.line_name]
         # Outer wide, low-opacity stroke first -> reads as a soft neon glow
         # under the crisp inner line once both are composited by the browser.

@@ -62,6 +62,7 @@ def print_route(route: dict) -> None:
     print(f"  Path: {' -> '.join(route['path_names'])}")
     print(f"  Stops: {route['num_stations']}   Interchanges: {route['interchanges']}")
     print(f"  Total time: {route['total_time_mins']:.0f} min   Total distance: {route['total_distance_km']:.2f} km")
+    print(f"  Fare (2nd class): Rs.{route['fare_inr']}   CO2 saved vs. car: {route['co2_saved_kg']:.2f} kg")
     for hop in route["hops"]:
         print(f"    {hop['from_name']:<24} -> {hop['to_name']:<24} [{hop['line']:<13}] "
               f"{hop['distance_km']:>5.2f} km / {hop['travel_time_mins']:>4.0f} min")

@@ -118,6 +118,8 @@ def _route_card(title: str, route: dict, stations_df: pd.DataFrame, beam: bool =
           <span><strong>{route['total_distance_km']:.1f}</strong> km</span>
           <span><strong>{route['num_stations']}</strong> stops</span>
           <span><strong>{route['interchanges']}</strong> interchange{'s' if route['interchanges'] != 1 else ''}</span>
+          <span><strong>&#8377;{route['fare_inr']}</strong> fare</span>
+          <span><strong>{route['co2_saved_kg']:.1f}</strong> kg CO&#8322; saved</span>
         </div>
       </div>
       <div class="ticket-tear"></div>
@@ -177,7 +179,7 @@ a{color:var(--cyan);}
   position:relative; z-index:3; background:#000; border-bottom:2px solid var(--amber);
   overflow:hidden; white-space:nowrap; box-shadow:0 2px 24px rgba(255,176,0,.15);
 }
-.marquee-track{ display:inline-block; padding-left:100%; animation:marquee 32s linear infinite; }
+.marquee-track{ display:inline-block; padding-left:100%; animation:marquee var(--marquee-dur,32s) linear infinite; }
 .marquee-track span{
   font-family:var(--font-display); font-size:20px; letter-spacing:.04em; color:var(--amber);
   text-shadow:0 0 8px rgba(255,176,0,.65); padding:6px 0;
@@ -258,9 +260,9 @@ h2.section-title::before{ content:"// "; color:var(--pink); }
 .route-label{font-size:9.5px; fill:var(--faint); font-family:var(--font-body);}
 
 /* rotating gradient border beam, reserved for the route cards */
-.beam-card{ position:relative; padding:2px; isolation:isolate; }
+.beam-card{ position:relative; padding:2px; isolation:isolate; overflow:hidden; }
 .beam-card::before{
-  content:""; position:absolute; inset:-60%; z-index:-1;
+  content:""; position:absolute; inset:-2px; z-index:-1;
   background:conic-gradient(from 0deg, transparent 0 55%, var(--pink), var(--cyan), var(--western), transparent 78% 100%);
   animation:beam-spin 5s linear infinite;
 }
@@ -301,6 +303,34 @@ h2.section-title::before{ content:"// "; color:var(--pink); }
 .btn-ghost{background:transparent; border-color:var(--border); color:var(--text);}
 .btn-ghost:hover{border-color:var(--cyan); color:var(--cyan); transform:translate(-2px,-2px);}
 
+/* ---------- Live route planner ---------- */
+.planner-card{background:var(--surface); border:2px solid var(--border); padding:22px 24px;}
+.planner-row{display:grid; grid-template-columns:1fr auto 1fr auto auto; gap:12px; align-items:end;}
+@media (max-width:760px){ .planner-row{grid-template-columns:1fr; } }
+.planner-field label{display:block; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--faint); margin-bottom:6px;}
+.planner-field input, .planner-field select{
+  width:100%; background:var(--surface-2); border:2px solid var(--border); color:var(--text);
+  font-family:var(--font-body); font-size:14px; padding:10px 12px; box-sizing:border-box;
+}
+.planner-field input:focus, .planner-field select:focus{outline:none; border-color:var(--cyan);}
+.planner-swap{
+  background:var(--surface-2); border:2px solid var(--border); color:var(--cyan);
+  width:40px; height:40px; cursor:pointer; font-size:16px; line-height:1;
+}
+.planner-swap:hover{border-color:var(--cyan);}
+.planner-error{color:var(--pink); font-size:13px; margin-top:12px; display:none;}
+.planner-error.visible{display:block;}
+.planner-result{margin-top:20px;}
+.planner-result:empty{margin-top:0;}
+.stop-chip-row{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:14px;}
+.stop-chip{
+  display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:11.5px;
+  background:var(--surface-2); border:1px solid var(--border); padding:4px 9px 4px 6px; border-radius:999px;
+}
+.stop-chip .dot{width:8px; height:8px; border-radius:50%; flex:none; box-shadow:0 0 6px currentColor;}
+.stop-chip.hub{border-color:#FFD24C; color:#FFD24C;}
+.stop-arrow{color:var(--faint); font-size:11px;}
+
 footer{position:relative; z-index:3; border-top:2px solid var(--border); padding:32px 0 60px; color:var(--faint); font-size:12px;}
 footer h4{font-family:var(--font-display); color:var(--amber); font-size:16px; letter-spacing:.03em; margin:0 0 10px;}
 footer ul{margin:0; padding-left:18px;}
@@ -321,9 +351,15 @@ def _marquee_html(stations_df: pd.DataFrame) -> str:
         tag = " -- INTERCHANGE" if row.interchange_hub else ""
         items.append(f'<span>{row.name.upper()}{tag}</span><span class="sep">&bull;</span>')
     strip = "".join(items)
+    # A per-station-count guess for the duration was still not slow enough
+    # in practice (font-width varies per name, so pixel distance doesn't
+    # scale cleanly with item count). The reliable fix is to measure the
+    # strip's actual rendered width at runtime and derive the duration from
+    # a fixed, comfortable reading speed -- see the script at the bottom of
+    # the page that sets --marquee-dur once the DOM has laid out.
     return f"""
     <div class="marquee-bar">
-      <div class="marquee-track">{strip}{strip}</div>
+      <div class="marquee-track" id="marqueeTrack" style="--marquee-dur:90s">{strip}{strip}</div>
     </div>"""
 
 
@@ -336,7 +372,7 @@ def _hero_html(stations_df: pd.DataFrame, network_summary: dict) -> str:
           <div class="eyebrow">&#9679; live network analytics &middot; {len(stations_df)} stations</div>
           <h1 class="title">Mumbai Suburban Rail<br><span class="accent">Efficiency &amp; Accessibility</span></h1>
           <p class="lede">
-            A graph + spatial model of the Western, Central and Harbour lines &mdash;
+            A graph + spatial model of the Western, Central, Harbour and Trans-Harbour lines &mdash;
             real stations, real coordinates, real topology &mdash; built to surface
             the busiest interchanges, the fastest cross-network routes, and how far
             a 1&nbsp;km walk reaches from each hub.
@@ -350,7 +386,7 @@ def _hero_html(stations_df: pd.DataFrame, network_summary: dict) -> str:
       <div class="container stat-row">
         {_stat_tile("Stations modeled", str(network_summary['num_stations']), delay=0)}
         {_stat_tile("Track segments", str(network_summary['num_edges']), f"{network_summary['total_track_km']} km total", delay=80)}
-        {_stat_tile("Combined daily footfall", f"{network_summary['total_daily_footfall']/1e6:.2f}M", "riders across all 25 stations", delay=160)}
+        {_stat_tile("Combined daily footfall", f"{network_summary['total_daily_footfall']/1e6:.2f}M", f"riders across all {network_summary['num_stations']} stations", delay=160)}
         {_stat_tile("Interchange hubs", str(len(network_summary['interchange_hubs'])), "found via centrality, not asserted", delay=240)}
       </div>
     </section>"""
@@ -378,6 +414,57 @@ def _routes_html(routes: dict[str, dict], stations_df: pd.DataFrame) -> str:
         <div class="route-grid">
           {_route_card("Fastest by travel time", time_route, stations_df, beam=True)}
           {_route_card("Shortest by distance", dist_route, stations_df, beam=True)}
+        </div>
+      </div>
+    </section>
+    <div class="container"><div class="divider"></div></div>"""
+
+
+def _planner_html(stations_df: pd.DataFrame) -> str:
+    """Live, client-side route planner: pick *any* two stations in the
+    browser and get an instant Dijkstra route -- unlike the two route cards
+    above (baked in at build time for one fixed origin/destination pair),
+    this runs entirely in JS against the embedded network graph, no Python
+    re-run needed."""
+    options = "".join(
+        f'<option value="{name}"></option>'
+        for name in sorted(stations_df["name"].unique())
+    )
+    return f"""
+    <section class="fade-in">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Live Route Planner</h2>
+            <p class="section-desc">
+              Pick any two of the {len(stations_df)} modeled stations -- this runs Dijkstra's algorithm
+              live in your browser against the same graph, no server round-trip.
+            </p>
+          </div>
+        </div>
+        <div class="planner-card pixel-cut">
+          <div class="planner-row">
+            <div class="planner-field">
+              <label for="plannerFrom">From</label>
+              <input id="plannerFrom" list="stationNames" placeholder="e.g. Andheri" autocomplete="off">
+            </div>
+            <button type="button" class="planner-swap" id="plannerSwap" title="Swap origin/destination">&#8646;</button>
+            <div class="planner-field">
+              <label for="plannerTo">To</label>
+              <input id="plannerTo" list="stationNames" placeholder="e.g. Thane" autocomplete="off">
+            </div>
+            <div class="planner-field">
+              <label for="plannerWeight">Optimize by</label>
+              <select id="plannerWeight">
+                <option value="time">Travel time</option>
+                <option value="distance">Distance</option>
+              </select>
+            </div>
+            <button type="button" class="btn btn-primary pixel-cut" id="plannerGo">Find route &rarr;</button>
+          </div>
+          <datalist id="stationNames">{options}</datalist>
+          <div class="planner-error" id="plannerError"></div>
+          <div class="planner-result" id="plannerResult"></div>
         </div>
       </div>
     </section>
@@ -420,7 +507,7 @@ def _coverage_html(buffer_stats: dict, network_summary: dict) -> str:
         <div class="coverage-grid">
           {_stat_tile("Interchange hubs buffered", str(n_hubs))}
           {_stat_tile("Total catchment area", f"{buffer_stats.get('total_buffer_area_km2', 0):.1f} km²", "non-overlapping, 1 km radius each")}
-          {_stat_tile("Avg. hop distance", f"{network_summary.get('avg_degree', 0):.2f}", "mean node degree")}
+          {_stat_tile("Avg. node degree", f"{network_summary.get('avg_degree', 0):.2f}", "mean connections per station")}
         </div>
         <div class="cta-row">
           <a class="btn btn-primary pixel-cut" href="maps/mumbai_rail_map.html">Open interactive map &rarr;</a>
@@ -463,6 +550,204 @@ _JS = """
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (function () {
+  // ---- departure-board marquee: derive speed from actual pixel width ----
+  // A guessed duration (by station count, or a flat constant) drifts wrong
+  // as soon as station names get longer/shorter or the count changes -- the
+  // only reliable fix is to measure the rendered strip and pick a duration
+  // for a fixed, comfortable px/s reading speed once the browser has laid
+  // it out.
+  var track = document.getElementById('marqueeTrack');
+  if (track) {
+    var setMarqueeSpeed = function () {
+      var stripWidth = track.scrollWidth / 2; // track = strip + strip
+      var PX_PER_SEC = 100; // typical news-ticker pace, comfortably readable
+      var duration = Math.max(30, Math.round(stripWidth / PX_PER_SEC));
+      track.style.setProperty('--marquee-dur', duration + 's');
+    };
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(setMarqueeSpeed);
+    } else {
+      setMarqueeSpeed();
+    }
+    window.addEventListener('resize', setMarqueeSpeed);
+  }
+
+  // ---- live route planner: Dijkstra over the embedded network, in-browser ----
+  (function () {
+    var NET = NETWORK_DATA_JSON;
+    var LINE_COLORS = LINE_COLORS_JSON;
+
+    // Build an adjacency list once: id -> [{to, line, dist, time}, ...].
+    // The network is undirected (trains run both directions on the same
+    // track), so every edge is added in both directions.
+    var adj = {};
+    Object.keys(NET.stations).forEach(function (id) { adj[id] = []; });
+    NET.edges.forEach(function (e) {
+      var a = e[0], b = e[1], line = e[2], dist = e[3], time = e[4];
+      adj[a].push({ to: b, line: line, dist: dist, time: time });
+      adj[b].push({ to: a, line: line, dist: dist, time: time });
+    });
+
+    var nameToId = {};
+    Object.keys(NET.stations).forEach(function (id) {
+      nameToId[NET.stations[id].n.toLowerCase()] = id;
+    });
+
+    function resolveStation(token) {
+      if (!token) return null;
+      var t = token.trim();
+      if (NET.stations[t.toUpperCase()]) return t.toUpperCase();
+      return nameToId[t.toLowerCase()] || null;
+    }
+
+    // Plain O(V^2) Dijkstra -- the network has ~100-150 nodes, so a heap
+    // buys nothing here and this stays trivially easy to read/verify.
+    function dijkstra(srcId, dstId, weightKey) {
+      var dist = {}, prev = {}, viaLine = {}, visited = {};
+      Object.keys(NET.stations).forEach(function (id) { dist[id] = Infinity; });
+      dist[srcId] = 0;
+
+      while (true) {
+        var u = null, best = Infinity;
+        for (var id in dist) {
+          if (!visited[id] && dist[id] < best) { best = dist[id]; u = id; }
+        }
+        if (u === null || u === dstId) break;
+        visited[u] = true;
+        adj[u].forEach(function (edge) {
+          var w = weightKey === 'distance' ? edge.dist : edge.time;
+          var alt = dist[u] + w;
+          if (alt < dist[edge.to]) {
+            dist[edge.to] = alt;
+            prev[edge.to] = u;
+            viaLine[edge.to] = edge;
+          }
+        });
+      }
+      if (dist[dstId] === undefined || dist[dstId] === Infinity) return null;
+
+      var pathIds = [dstId], cur = dstId;
+      while (cur !== srcId) {
+        cur = prev[cur];
+        if (cur === undefined) return null;
+        pathIds.unshift(cur);
+      }
+
+      var totalTime = 0, totalDist = 0, interchanges = 0, prevLine = null;
+      for (var i = 1; i < pathIds.length; i++) {
+        var edge = viaLine[pathIds[i]];
+        totalTime += edge.time;
+        totalDist += edge.dist;
+        if (prevLine !== null && edge.line !== prevLine) interchanges++;
+        prevLine = edge.line;
+      }
+      return {
+        pathIds: pathIds, totalTime: totalTime, totalDist: totalDist,
+        interchanges: interchanges,
+      };
+    }
+
+    // Mirrors src/fare.py exactly -- keep the two in sync if the slabs change.
+    var FARE_SLABS = [[5, 5], [10, 10], [15, 15], [20, 15], [30, 20], [40, 25], [50, 30], [60, 35], [80, 40], [120, 50]];
+    function estimateFare(km) {
+      for (var i = 0; i < FARE_SLABS.length; i++) {
+        if (km <= FARE_SLABS[i][0]) return FARE_SLABS[i][1];
+      }
+      return FARE_SLABS[FARE_SLABS.length - 1][1];
+    }
+    function estimateCo2Saved(km) {
+      return Math.round((121.0 - 41.0) * km) / 1000;
+    }
+
+    function lineColor(line) {
+      var tokens = String(line).split('/');
+      for (var i = 0; i < tokens.length; i++) {
+        if (LINE_COLORS[tokens[i]]) return LINE_COLORS[tokens[i]];
+      }
+      return LINE_COLORS.Interchange;
+    }
+
+    function renderResult(route) {
+      var chips = route.pathIds.map(function (id, i) {
+        var st = NET.stations[id];
+        var color = lineColor(st.l);
+        var arrow = i > 0 ? '<span class="stop-arrow">&rarr;</span>' : '';
+        return arrow + '<span class="stop-chip' + (st.h ? ' hub' : '') + '" style="color:' + color + '">'
+          + '<span class="dot" style="background:' + color + '"></span>' + st.n + '</span>';
+      }).join('');
+
+      var fareInr = estimateFare(route.totalDist);
+      var co2 = estimateCo2Saved(route.totalDist);
+
+      document.getElementById('plannerResult').innerHTML =
+        '<div class="route-card pixel-cut">'
+        + '<div class="route-card-head"><h3>' + NET.stations[route.pathIds[0]].n + ' &rarr; '
+        + NET.stations[route.pathIds[route.pathIds.length - 1]].n + '</h3>'
+        + '<div class="route-totals">'
+        + '<span><strong>' + Math.round(route.totalTime) + '</strong> min</span>'
+        + '<span><strong>' + route.totalDist.toFixed(1) + '</strong> km</span>'
+        + '<span><strong>' + route.pathIds.length + '</strong> stops</span>'
+        + '<span><strong>' + route.interchanges + '</strong> interchange' + (route.interchanges !== 1 ? 's' : '') + '</span>'
+        + '<span><strong>&#8377;' + fareInr + '</strong> fare</span>'
+        + '<span><strong>' + co2.toFixed(1) + '</strong> kg CO&#8322; saved</span>'
+        + '</div></div>'
+        + '<div class="ticket-tear"></div>'
+        + '<div class="stop-chip-row">' + chips + '</div>'
+        + '</div>';
+    }
+
+    function runPlanner() {
+      var errorEl = document.getElementById('plannerError');
+      errorEl.classList.remove('visible');
+      document.getElementById('plannerResult').innerHTML = '';
+
+      var fromToken = document.getElementById('plannerFrom').value;
+      var toToken = document.getElementById('plannerTo').value;
+      var weightKey = document.getElementById('plannerWeight').value;
+
+      var srcId = resolveStation(fromToken);
+      var dstId = resolveStation(toToken);
+
+      if (!fromToken || !toToken) {
+        errorEl.textContent = 'Enter both a "from" and a "to" station.';
+        errorEl.classList.add('visible');
+        return;
+      }
+      if (!srcId || !dstId) {
+        errorEl.textContent = 'Unrecognized station name: "' + (!srcId ? fromToken : toToken) + '". Pick one from the suggestions.';
+        errorEl.classList.add('visible');
+        return;
+      }
+      if (srcId === dstId) {
+        errorEl.textContent = 'Origin and destination are the same station.';
+        errorEl.classList.add('visible');
+        return;
+      }
+
+      var route = dijkstra(srcId, dstId, weightKey);
+      if (!route) {
+        errorEl.textContent = 'No route found between those stations.';
+        errorEl.classList.add('visible');
+        return;
+      }
+      renderResult(route);
+    }
+
+    var goBtn = document.getElementById('plannerGo');
+    if (goBtn) {
+      goBtn.addEventListener('click', runPlanner);
+      ['plannerFrom', 'plannerTo'].forEach(function (id) {
+        document.getElementById(id).addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') runPlanner();
+        });
+      });
+      document.getElementById('plannerSwap').addEventListener('click', function () {
+        var a = document.getElementById('plannerFrom'), b = document.getElementById('plannerTo');
+        var tmp = a.value; a.value = b.value; b.value = tmp;
+      });
+    }
+  })();
+
   // ---- count-up + leaderboard bar reveal on scroll ----
   var observer = new IntersectionObserver(function (entries) {
     entries.forEach(function (e) {
@@ -628,6 +913,22 @@ def build_dashboard(
     graph_edges = [{"source": r.source_id, "target": r.target_id} for r in edges_df.itertuples(index=False)]
     graph_json = json.dumps({"nodes": graph_nodes, "edges": graph_edges})
 
+    # Compact network payload for the client-side route planner: station
+    # lookup by id + a flat edge list. Keys are kept short (n/l/lat/lon/h)
+    # since this is inlined into the page and parsed by every visitor.
+    network_stations = {
+        r.station_id: {
+            "n": r.name, "l": r.line, "lat": r.latitude, "lon": r.longitude,
+            "h": bool(r.interchange_hub),
+        }
+        for r in stations_df.itertuples(index=False)
+    }
+    network_edges = [
+        [r.source_id, r.target_id, r.line_name, r.distance_km, r.travel_time_mins]
+        for r in edges_df.itertuples(index=False)
+    ]
+    network_json = json.dumps({"stations": network_stations, "edges": network_edges})
+
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     body = "\n".join([
@@ -635,12 +936,18 @@ def build_dashboard(
         _marquee_html(stations_df),
         _hero_html(stations_df, network_summary),
         _routes_html(routes, stations_df),
+        _planner_html(stations_df),
         _leaderboard_html(centrality_df),
         _coverage_html(buffer_stats, network_summary),
         _footer_html(generated_at),
     ])
 
-    js = _JS.replace("GRAPH_DATA_JSON", graph_json)
+    line_colors_json = json.dumps(config.LINE_COLORS)
+    js = (
+        _JS.replace("GRAPH_DATA_JSON", graph_json)
+        .replace("NETWORK_DATA_JSON", network_json)
+        .replace("LINE_COLORS_JSON", line_colors_json)
+    )
 
     html = f"""<!doctype html>
 <html lang="en">

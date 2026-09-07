@@ -149,6 +149,11 @@ _THEME_CSS = """
     font-family:'Space Grotesk',sans-serif; font-size:16px; margin:0 0 4px; color:#fff; letter-spacing:-.01em;
   }
   .map-hero p { font-size:11.5px; color:#9099ad; margin:0 0 10px; line-height:1.5; }
+  .map-hero-back {
+    display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:600;
+    color:#22F0FF; text-decoration:none; margin-bottom:10px; letter-spacing:.02em;
+  }
+  .map-hero-back:hover { text-decoration:underline; }
   .map-hero .legend-row { display:flex; align-items:center; gap:8px; font-size:12px; margin:5px 0; }
   .map-hero .dot { width:10px; height:10px; border-radius:50%; flex:none; box-shadow:0 0 8px currentColor; }
   .map-hero .dot.ring { background:transparent; border:2px solid currentColor; }
@@ -264,6 +269,7 @@ def build_folium_map(
 
     hero_html = """
     <div class="map-hero">
+      <a href="../dashboard.html" class="map-hero-back">&larr; Back to Dashboard</a>
       <h1>Mumbai Suburban Rail</h1>
       <p>Western &middot; Central &middot; Harbour &middot; Trans-Harbour<br>
          nodes scaled by daily footfall, hubs pulse gold.</p>

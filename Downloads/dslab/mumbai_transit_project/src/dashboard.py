@@ -246,6 +246,49 @@ h2.section-title::before{ content:"// "; color:var(--pink); }
 .section-desc{color:var(--muted); font-size:13.5px; margin:6px 0 0; max-width:60ch;}
 .divider{height:2px; background:repeating-linear-gradient(90deg,var(--border) 0 8px,transparent 8px 14px);}
 
+/* ---------- Map preview ---------- */
+.map-preview{position:relative; border:2px solid var(--border); background:var(--surface); overflow:hidden;}
+.map-preview iframe{display:block; width:100%; height:520px; border:0; filter:saturate(1.05);}
+@media (max-width:760px){ .map-preview iframe{height:360px;} }
+.map-preview-cta{
+  position:absolute; top:16px; right:16px; z-index:5;
+  background:rgba(10,7,20,.88); backdrop-filter:blur(10px);
+  border:2px solid var(--pink); color:#fff; font-family:var(--font-display);
+  font-size:14px; padding:9px 16px; text-decoration:none; display:inline-flex;
+  align-items:center; gap:8px; box-shadow:4px 4px 0 rgba(255,46,154,.4);
+  transition:transform .15s ease;
+}
+.map-preview-cta:hover{transform:translate(-2px,-2px);}
+.map-preview-note{
+  position:absolute; bottom:0; left:0; right:0; z-index:4; padding:10px 16px;
+  background:linear-gradient(0deg,rgba(10,7,20,.9),transparent);
+  font-size:11.5px; color:var(--faint); font-family:var(--font-mono);
+}
+
+/* ---------- How it works ---------- */
+.how-grid{display:flex; align-items:stretch;}
+@media (max-width:900px){ .how-grid{flex-direction:column; gap:14px;} }
+.how-step{
+  background:var(--surface); border:2px solid var(--border); padding:20px 18px; position:relative;
+  flex:1 1 0; min-width:0;
+}
+.how-step-num{
+  font-family:var(--font-display); font-size:13px; color:var(--pink); letter-spacing:.08em;
+  margin-bottom:8px;
+}
+.how-step h4{margin:0 0 8px; font-family:var(--font-display); font-size:17px; color:#fff;}
+.how-step p{margin:0; font-size:12.5px; color:var(--muted); line-height:1.55;}
+.how-step code{
+  display:block; margin-top:10px; font-family:var(--font-mono); font-size:11px; color:var(--cyan);
+  background:var(--surface-2); border:1px solid var(--border); padding:8px 10px; overflow-x:auto; white-space:nowrap;
+}
+.how-arrow{
+  display:flex; align-items:center; justify-content:center; color:var(--pink); font-size:20px;
+  background:var(--surface); border-top:2px solid var(--border); border-bottom:2px solid var(--border);
+  flex:0 0 36px;
+}
+@media (max-width:900px){ .how-arrow{display:none;} }
+
 /* ---------- Route cards ---------- */
 .route-grid{display:grid; grid-template-columns:1fr 1fr; gap:20px;}
 @media (max-width:860px){ .route-grid{grid-template-columns:1fr;} }
@@ -390,6 +433,72 @@ def _hero_html(stations_df: pd.DataFrame, network_summary: dict) -> str:
         {_stat_tile("Interchange hubs", str(len(network_summary['interchange_hubs'])), "found via centrality, not asserted", delay=240)}
       </div>
     </section>"""
+
+
+def _map_preview_html() -> str:
+    """A live, embedded preview of the Folium map right on the homepage --
+    the map used to be reachable only via a small text link buried in the
+    Coverage section at the bottom of the page; landing on it immediately
+    gives the report an actual visual centerpiece instead of stats-first."""
+    return f"""
+    <section class="fade-in">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Explore the Network</h2>
+            <p class="section-desc">The full interactive map, live and embedded &mdash; pan, zoom, toggle
+              lines, and click any station or hub for its stats.</p>
+          </div>
+        </div>
+        <div class="map-preview pixel-cut">
+          <a class="map-preview-cta" href="maps/mumbai_rail_map.html" target="_blank" rel="noopener">Open full map &#8599;</a>
+          <iframe src="maps/mumbai_rail_map.html" loading="lazy" title="Mumbai Suburban Rail interactive map"></iframe>
+          <div class="map-preview-note">Real coordinates &middot; real topology &middot; Leaflet + OpenStreetMap</div>
+        </div>
+      </div>
+    </section>
+    <div class="container"><div class="divider"></div></div>"""
+
+
+def _how_it_works_html() -> str:
+    """Show the actual computation pipeline, not just its output -- each
+    step names the real function/formula behind it so the numbers on this
+    page read as computed, not asserted."""
+    steps = [
+        ("01", "Clean the data", "pandas validates every station/edge, drops duplicates, "
+         "type-checks coordinates.", "load_and_clean_data()"),
+        ("02", "Measure real distance", "Haversine great-circle formula over each edge's "
+         "WGS84 coordinates -- not a flat-plane approximation.", "2 &middot; r &middot; asin(&radic;a)"),
+        ("03", "Route with Dijkstra", "networkx finds the shortest path by travel time or "
+         "distance across the full graph.", "nx.shortest_path(G, src, dst, weight=w)"),
+        ("04", "Fare + CO&#8322; impact", "Distance maps to a published 2nd-class fare slab and "
+         "a train-vs-car emissions delta.", "(121 - 41) g/km &times; distance"),
+    ]
+    cells = []
+    for i, (num, title, desc, code) in enumerate(steps):
+        if i > 0:
+            cells.append('<div class="how-arrow">&rarr;</div>')
+        cells.append(f"""
+        <div class="how-step">
+          <div class="how-step-num">STEP {num}</div>
+          <h4>{title}</h4>
+          <p>{desc}</p>
+          <code>{code}</code>
+        </div>""")
+    return f"""
+    <section class="fade-in">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">How The Numbers Work</h2>
+            <p class="section-desc">Every stat on this page traces back to one of these four steps &mdash;
+              real algorithms over real data, not hardcoded figures.</p>
+          </div>
+        </div>
+        <div class="how-grid">{''.join(cells)}</div>
+      </div>
+    </section>
+    <div class="container"><div class="divider"></div></div>"""
 
 
 def _routes_html(routes: dict[str, dict], stations_df: pd.DataFrame) -> str:
@@ -935,8 +1044,10 @@ def build_dashboard(
         '<div class="scanlines"></div><div class="vignette"></div>',
         _marquee_html(stations_df),
         _hero_html(stations_df, network_summary),
+        _map_preview_html(),
         _routes_html(routes, stations_df),
         _planner_html(stations_df),
+        _how_it_works_html(),
         _leaderboard_html(centrality_df),
         _coverage_html(buffer_stats, network_summary),
         _footer_html(generated_at),

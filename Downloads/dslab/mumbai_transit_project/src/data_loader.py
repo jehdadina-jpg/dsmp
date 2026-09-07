@@ -3,11 +3,13 @@
 This module is the single source of truth for the project's data. It models
 **every real station** on the Western Line (Churchgate-Bordi Road, including
 the Dahanu Road extension), Central Line (CSMT-Kalyan plus both the
-Kalyan-Kasara and Kalyan-Khopoli/Karjat branches, and the Kurla-Lokmanya
-Tilak Terminus spur), Harbour Line (CSMT-Panvel, plus the real Wadala
-Road-King's Circle-Andheri-Goregaon branch) and the full Trans-Harbour Line
-(Thane-Vashi, both the direct express edge and every real intermediate stop:
-Airoli, Digha Gaon, Rabale, Ghansoli, Koparkhairane, Turbhe). Nothing here is
+Kalyan-Kasara and Kalyan-Khopoli/Karjat branches), Harbour Line (CSMT-Panvel,
+plus the real Wadala Road-King's Circle-Andheri-Goregaon branch) and the full
+Trans-Harbour Line (Thane-Vashi, every real intermediate stop: Airoli, Digha
+Gaon, Rabale, Ghansoli, Koparkhairane, Turbhe). Lokmanya Tilak Terminus (a
+real but effectively dead-end spur 0.9km off Kurla, adding a visually
+confusing near-duplicate point with no through traffic) is intentionally not
+modeled. Nothing here is
 procedurally randomised.
 
 Data provenance (full citations in README.md -> "Data Sources & Methodology"):
@@ -34,10 +36,10 @@ Data provenance (full citations in README.md -> "Data Sources & Methodology"):
 
 Scope: every real stop on the Western, Central, Harbour and Trans-Harbour
 lines, including the Virar-Bordi Road extension, the Kalyan-Kasara and
-Kalyan-Khopoli (via Karjat) branches, the Kurla-Lokmanya Tilak Terminus
-spur, the Wadala Road-King's Circle-Andheri-Goregaon Harbour branch, and
-every real Trans-Harbour stop between Thane and Vashi -- not the separate
-Vasai-Diva, Airport, Uran or Panvel-Karjat lines. CSMT-Masjid-Sandhurst Road
+Kalyan-Khopoli (via Karjat) branches, the Wadala Road-King's Circle-Andheri-
+Goregaon Harbour branch, and every real Trans-Harbour stop between Thane and
+Vashi -- not the separate Vasai-Diva, Airport, Uran or Panvel-Karjat lines,
+nor the Kurla-Lokmanya Tilak Terminus dead-end spur (see above). CSMT-Masjid-Sandhurst Road
 is real shared trackage used by both Central and Harbour services, so it is
 modeled as shared edges/stations (line="Central/Harbour") rather than
 duplicated, the same way Dadar is shared between Western/Central and the
@@ -194,8 +196,6 @@ _STATION_RECORDS: list[StationRecord] = [
     StationRecord("DOL", "Dolavli", "Central", 18.809000, 73.396000, 3_000, False),
     StationRecord("LOW", "Lowjee", "Central", 18.785300, 73.409000, 3_000, False),
     StationRecord("KHP", "Khopoli", "Central", 18.788000, 73.334600, 65_000, False),
-    # -- Central Line branch: Kurla -> Lokmanya Tilak Terminus ---------------
-    StationRecord("LTT", "Lokmanya Tilak Terminus", "Central", 19.072800, 72.882600, 90_000, False),
     # -- Trans-Harbour intermediate stops: Thane -> Vashi, 6 stations --------
     StationRecord("ARL", "Airoli", "Trans-Harbour", 19.159200, 72.998600, 55_000, False),
     StationRecord("DGG", "Digha Gaon", "Trans-Harbour", 19.147000, 73.000000, 12_000, False),
@@ -284,8 +284,6 @@ _EDGE_TOPOLOGY: list[tuple[str, str, str]] = [
     ("SHL", "NER", "Central"), ("NER", "KRJ", "Central"), ("KRJ", "PLS", "Central"),
     ("PLS", "KLI", "Central"), ("KLI", "DOL", "Central"), ("DOL", "LOW", "Central"),
     ("LOW", "KHP", "Central"),
-    # Central branch: Kurla -> Lokmanya Tilak Terminus
-    ("KUR", "LTT", "Central"),
 ]
 
 

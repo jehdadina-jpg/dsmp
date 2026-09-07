@@ -1,0 +1,31 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Generated data & outputs (reproducible via `python main.py --full`)
+data/raw/*.csv
+data/processed/*.csv
+data/processed/*.geojson
+output/maps/*.html
+output/*.html
+
+# Keep the directories themselves under version control
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!output/maps/.gitkeep
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Secrets
+.env

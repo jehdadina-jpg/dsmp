@@ -1,0 +1,3 @@
+# Development / testing extras (not required to run the pipeline)
+-r requirements.txt
+pytest>=7.4.0

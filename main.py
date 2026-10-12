@@ -137,6 +137,7 @@ def run_pipeline(
         routes={"time": route_time, "distance": route_distance},
         network_summary=summary,
         buffer_stats=spatial_results,
+        insights=graph_analytics.compute_insights(graph, centrality_df),
     )
     print(f"  Dashboard       : {config.DASHBOARD_HTML}")
 
@@ -243,6 +244,7 @@ def interactive_menu() -> None:
                     stations_df, edges_df, layout_3d, centrality_df,
                     {"time": route_time, "distance": route_distance},
                     graph_analytics.network_summary(graph), spatial_results,
+                    graph_analytics.compute_insights(graph, centrality_df),
                 )
                 print(f"  Dashboard saved to {config.DASHBOARD_HTML}")
 

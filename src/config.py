@@ -29,6 +29,7 @@ for _dir in (RAW_DIR, PROCESSED_DIR, MAPS_DIR):
 # Raw (source-of-truth extract) files
 STATIONS_RAW_CSV: Path = RAW_DIR / "stations_raw.csv"
 EDGES_RAW_CSV: Path = RAW_DIR / "edges_raw.csv"
+OSM_RAIL_JSON: Path = RAW_DIR / "osm_rail.json"  # cached OpenStreetMap track centerlines
 
 # Cleaned / enriched files
 STATIONS_CLEAN_CSV: Path = PROCESSED_DIR / "stations_clean.csv"

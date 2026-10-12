@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Literal
 
 import networkx as nx
+import numpy as np
 import pandas as pd
 
 from src import config, fare
@@ -172,6 +173,68 @@ def compute_3d_layout(graph: nx.Graph, seed: int = 42) -> dict[str, tuple[float,
     """
     positions = nx.spring_layout(graph, dim=3, seed=seed, weight="travel_time_mins")
     return {node: (float(x), float(y), float(z)) for node, (x, y, z) in positions.items()}
+
+
+def compute_insights(graph: nx.Graph, centrality_df: pd.DataFrame) -> dict:
+    """Deeper network science for the dashboard's analytics lab.
+
+    * Footfall inequality -- Lorenz curve + Gini coefficient over stations.
+    * Reach -- travel-time distribution from the most central hub.
+    * Diameter -- the longest of all shortest trips (by time), and the mean trip.
+    * Resilience -- articulation points: stations whose closure splits the network.
+    * Global efficiency -- mean inverse shortest-path length (Latora & Marchiori).
+    * Crowd vs. structure -- betweenness against footfall for every station.
+    """
+    names = nx.get_node_attributes(graph, "name")
+    lines = nx.get_node_attributes(graph, "line")
+    footfall = pd.Series(nx.get_node_attributes(graph, "daily_footfall")).astype(float)
+
+    # Lorenz curve: cumulative share of riders vs. cumulative share of stations.
+    sorted_ff = np.sort(footfall.values)
+    cum = np.concatenate([[0.0], np.cumsum(sorted_ff) / sorted_ff.sum()])
+    n = len(sorted_ff)
+    gini = float(1 - 2 * np.trapezoid(cum, dx=1 / n))
+    top10_share = float(footfall.nlargest(10).sum() / footfall.sum())
+
+    hub = centrality_df.iloc[0]["station_id"]
+    reach = nx.single_source_dijkstra_path_length(graph, hub, weight="travel_time_mins")
+    reach_mins = pd.Series(reach).drop(hub)
+
+    all_pairs = dict(nx.all_pairs_dijkstra_path_length(graph, weight="travel_time_mins"))
+    best = (None, None, -1.0)
+    trip_times = []
+    for a, row in all_pairs.items():
+        for b, t in row.items():
+            if a < b:
+                trip_times.append(t)
+                if t > best[2]:
+                    best = (a, b, t)
+
+    cut_nodes = sorted(nx.articulation_points(graph), key=lambda s: -footfall[s])
+    loop_nodes = {n for cycle in nx.cycle_basis(graph) for n in cycle}
+
+    scatter = [
+        {"id": r.station_id, "name": r.name, "line": r.line, "footfall": int(r.daily_footfall),
+         "betweenness": float(r.betweenness_centrality), "hub": "/" in str(r.line)}
+        for r in centrality_df.itertuples(index=False)
+    ]
+
+    return {
+        "lorenz": cum.round(4).tolist(),
+        "gini": round(gini, 3),
+        "top10_share": round(top10_share, 3),
+        "hub_id": hub,
+        "hub_name": names[hub],
+        "reach_mins": [round(float(m), 1) for m in reach_mins.sort_values()],
+        "reach_within": {t: round(float((reach_mins <= t).mean()), 3) for t in (30, 60, 90, 120)},
+        "diameter": {"from": names[best[0]], "to": names[best[1]], "mins": round(best[2], 1)},
+        "mean_trip_mins": round(float(np.mean(trip_times)), 1),
+        "global_efficiency": round(nx.global_efficiency(graph), 3),
+        "articulation_points": [{"id": s, "name": names[s], "line": lines[s], "footfall": int(footfall[s])}
+                                for s in cut_nodes],
+        "loop_station_count": len(loop_nodes),
+        "scatter": scatter,
+    }
 
 
 def network_summary(graph: nx.Graph) -> dict:

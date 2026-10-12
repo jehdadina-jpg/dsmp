@@ -1,0 +1,67 @@
+# Builds the dashboard and map with the real pipeline and publishes them to
+# GitHub Pages on every push to master. The OpenStreetMap track cache is
+# committed (data/raw/osm_rail.json), so the build needs no external API.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pipeline
+        run: python main.py --full
+
+      # Keep the repo's folder layout so the pages' relative links
+      # (map <-> dashboard, the GeoJSON download) keep working.
+      - name: Assemble site
+        run: |
+          mkdir -p _site/output/maps _site/data/processed
+          cp output/dashboard.html _site/output/
+          cp output/maps/mumbai_rail_map.html _site/output/maps/
+          cp data/processed/*.geojson _site/data/processed/
+          cat > _site/index.html <<'EOF'
+          <!doctype html>
+          <meta charset="utf-8">
+          <title>Local Pulse</title>
+          <meta http-equiv="refresh" content="0; url=output/dashboard.html">
+          <link rel="canonical" href="output/dashboard.html">
+          <a href="output/dashboard.html">Open the dashboard</a>
+          EOF
+          touch _site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

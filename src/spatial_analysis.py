@@ -163,7 +163,7 @@ _THEME_CSS = """
   .station-card .muted { color:#6B675F; font-size:10.5px; margin-top:6px; font-family:'JetBrains Mono',monospace; }
 
   .map-hero {
-    position:absolute; top:16px; left:16px; z-index:1000; width:270px;
+    position:absolute; top:12px; left:58px; z-index:1000; width:270px;
     background:rgba(11,11,12,.94); border:1px solid rgba(242,239,230,.14);
     box-shadow:0 20px 50px rgba(0,0,0,.5); font-family:'Archivo',sans-serif; color:#F2EFE6;
   }
